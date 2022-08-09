@@ -1,7 +1,7 @@
 //Board is M5 Atom Stack
 //IMU code referenced from https://docs.m5stack.com/en/api/atom/mpu
 //Orientation Filter based on https://courses.cs.washington.edu/courses/cse466/14au/labs/l4/madgwick_internal_report.pdf
-
+//Code based on M5 original code
 
 #include <Adafruit_NeoPixel.h> //This is for the onboard LEDs
 #include <Wire.h> //I2c for the MPU
@@ -179,6 +179,8 @@ void setup() {
 void loop() {
   
   M5.IMU.getAhrsData(&pitch,&roll,&yaw);
+  //pitch -90 to 90degrees
+  //roll -180 to 180degrees
   
   /*
   
