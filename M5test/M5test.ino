@@ -1,5 +1,5 @@
 //Board is M5 Atom Stack
-//Referenced from https://docs.m5stack.com/en/api/atom/mpu
+//IMU code referenced from https://docs.m5stack.com/en/api/atom/mpu
 //Orientation Filter based on https://courses.cs.washington.edu/courses/cse466/14au/labs/l4/madgwick_internal_report.pdf
 
 
@@ -11,6 +11,8 @@ float pitch, roll, yaw; //Stores attitude related variables.
 
 #define READ_DELAY  100 //magdwick filter is effective at low sampling rates
 float cal_pitch, cal_roll; //calibration during init;
+const uint8_t compare_no = 20; //compare n different readings during calibration
+const uint8_t difference = 1; //1 degrees diff between readings = stabalise
 
 //On board LED matrix
 #define LED_COUNT 25
@@ -33,6 +35,7 @@ void light_middle(int r, int g, int b){
   matrix.setPixelColor(12,matrix.Color(r,g,b));
   matrix.show();
 }
+
 void calibrate_IMU(){
   Serial.println("Calibrating");
   light_middle(100,0,0);//light up red during calibration
@@ -86,15 +89,80 @@ void calibrate_IMU(){
    
 }
 
+bool arr_is_valid(float diff, float *arr ){
+  //check if the diff between max and min is whithin the diff
+  
+  float max_value = -360.0;
+  float min_value = 360.0;
+  for(int i = 0; i < compare_no; i++){
+    if(arr[i] > max_value) max_value = arr[i];
+    if(arr[i] < min_value) min_value = arr[i];
+  }
+
+  return abs(max_value - min_value) <= diff;
+
+  /*
+  int no_increase = 0;
+  int no_decrease = 0;
+
+  for(int i = 1; i < compare_no; i++){
+    if(arr[i] > arr[i-1]) no_increase++;
+    else no_decrease++;
+  }
+
+  return (abs(no_increase - no_decrease) <= 2);*/
+}
+
+
 
 void calibrate_IMU_MAX(){
-  Serial.println("Calibrating");
+  //It appears that this is gradient descent. As such i will wait for the readings to be stabalised by comparing the gradients
   light_middle(100,0,0);//light up red during calibration
+
+  Serial.println("Calibrating");
+  
+  float prev_roll[compare_no];
+  float prev_pitch[compare_no];
+  int curr_index = 0;
+  int count = 0;
+
   cal_pitch = 0;
   cal_roll = 0;
 
+  while(1){
+    M5.IMU.getAhrsData(&pitch,&roll,&yaw);
+    
+    prev_pitch[curr_index] = pitch;
+    prev_roll[curr_index] = roll;
 
-  light_middle(0,100,0); //light up green when finished
+    if(arr_is_valid(difference, prev_roll) && arr_is_valid(difference,prev_pitch)&&count >= compare_no ){
+      //check that prev_roll and prev_pitch have stabalised
+      //at least compare_no readings are taken to prevent early activation
+      for(int i = 0; i  < compare_no; i++){
+        cal_pitch += prev_pitch[i];
+        cal_roll += prev_roll[i];
+      }
+
+      cal_pitch = cal_pitch / compare_no;
+      cal_roll = cal_roll / compare_no;
+
+      light_middle(0,100,0); //light up green when finished
+      Serial.println("Calibration Done");
+      Serial.printf("Cal pitch:%.2f, Cal roll:%.2f", cal_pitch,cal_roll);
+      Serial.println();
+
+      return;
+    }
+    else{
+      if(curr_index >= compare_no - 1) curr_index = 0;
+      else curr_index++;
+      
+      count++;
+      Serial.println(count);
+    }
+
+    delay(READ_DELAY);
+  }
   
 }
 
@@ -104,25 +172,29 @@ void setup() {
   init_matrix();
   M5.IMU.Init();
 
-  //calibrate_IMU();
+  //calibrate_IMU_MAX();
 
 }
 
 void loop() {
   
   M5.IMU.getAhrsData(&pitch,&roll,&yaw);
+  
+  /*
+  
   Serial.printf("ORGINAL pitch:%.2f, roll:%.2f", pitch,roll);
   Serial.println();
   pitch = pitch - cal_pitch;
   roll = roll - cal_roll;
   Serial.printf("CALIBRATED pitch:%.2f, roll:%.2f", pitch,roll);
   Serial.println();
+  */
 
   //For The serial plotter printout
-  /*Serial.print(pitch);
+  Serial.print(pitch);
   Serial.print(" ");
   Serial.print(roll);
-  Serial.println();*/
+  Serial.println();
   
   delay(READ_DELAY);
 
