@@ -1,7 +1,13 @@
-//Board is M5 Atom Stack
-//IMU code referenced from https://docs.m5stack.com/en/api/atom/mpu
-//Orientation Filter based on https://courses.cs.washington.edu/courses/cse466/14au/labs/l4/madgwick_internal_report.pdf
-//Code based on M5 original code
+/*
+Board is M5 Atom Stack
+IMU code referenced from https://docs.m5stack.com/en/api/atom/mpu
+Orientation Filter based on https://courses.cs.washington.edu/courses/cse466/14au/labs/l4/madgwick_internal_report.pdf
+Code based on M5 original code
+
+I used the onboard Neopixels as calibration LEDs. I realised that the m5 front was the roll. I think i cant change the axes in anyway 
+Hence, i skiped the calibration and relied purely based on the the AHRS wrapper provided
+*/
+
 
 #include <Adafruit_NeoPixel.h> //This is for the onboard LEDs
 #include <Wire.h> //I2c for the MPU
@@ -9,7 +15,7 @@
 
 float pitch, roll, yaw; //Stores attitude related variables.
 
-#define READ_DELAY  100 //magdwick filter is effective at low sampling rates
+#define READ_DELAY  50 //magdwick filter is effective at low sampling rates
 float cal_pitch, cal_roll; //calibration during init;
 const uint8_t compare_no = 20; //compare n different readings during calibration
 const uint8_t difference = 1; //1 degrees diff between readings = stabalise
@@ -36,6 +42,8 @@ void light_middle(int r, int g, int b){
   matrix.show();
 }
 
+
+//Calibration Functions that i attempted
 void calibrate_IMU(){
   Serial.println("Calibrating");
   light_middle(100,0,0);//light up red during calibration
@@ -100,20 +108,7 @@ bool arr_is_valid(float diff, float *arr ){
   }
 
   return abs(max_value - min_value) <= diff;
-
-  /*
-  int no_increase = 0;
-  int no_decrease = 0;
-
-  for(int i = 1; i < compare_no; i++){
-    if(arr[i] > arr[i-1]) no_increase++;
-    else no_decrease++;
-  }
-
-  return (abs(no_increase - no_decrease) <= 2);*/
 }
-
-
 
 void calibrate_IMU_MAX(){
   //It appears that this is gradient descent. As such i will wait for the readings to be stabalised by comparing the gradients
@@ -193,8 +188,8 @@ void loop() {
   */
 
   //For The serial plotter printout
-  Serial.print(pitch);
-  Serial.print(" ");
+  //Serial.print(pitch);
+  //Serial.print(" ");
   Serial.print(roll);
   Serial.println();
   

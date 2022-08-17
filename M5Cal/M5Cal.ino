@@ -95,7 +95,7 @@ void setup(){
 
     delay(1000);
 
-    calibrate_IMU();
+    //calibrate_IMU();
 
 }
 
@@ -103,7 +103,7 @@ void loop(){
     M5.IMU.getGyroData(&gx,&gy,&gz);
     M5.IMU.getAccelData(&ax,&ay,&az);
 
-    rectify_errors();
+    //rectify_errors();
 
     MahonyAHRSupdateIMU(
         gx * DEG_TO_RAD, gy * DEG_TO_RAD, gz * DEG_TO_RAD,
