@@ -2,7 +2,6 @@
 Slave Sketch
 This M5 recieves the esp-now message from the master and then  begins sampling
 Sampling rate defined from the messgae recieved
-Use MacAddress[5] as SlaveNo > During testing shown to be diff
 */
 
 #include "M5Atom.h" //helper functions for the MPU
