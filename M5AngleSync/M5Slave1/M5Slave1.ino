@@ -12,14 +12,26 @@ Sampling rate defined from the messgae recieved
 //On board LED matrix
 #define LED_COUNT 25
 #define LED_PIN   27
-#define BRIGHTNESS 100 //set as 0 if you do not want to show the indicator
+#define BRIGHTNESS 50 //set as 0 if you do not want to show the indicator
 bool led_off = true;
 Adafruit_NeoPixel matrix(LED_COUNT,LED_PIN , NEO_GRB + NEO_KHZ800);
+
+//CPU CLOCK
+#define CLOCKSPEED 80
+//function takes the following frequencies as valid values:
+//  240(Def), 160, 80    <<< For all XTAL types
+//  40, 20, 10      <<< For 40MHz XTAL
 
 //Deep sleep button
 #define BUTTON 39
 #define BUTTON_PIN_BITMASK 0x8000000000 // 2^39 in hex
-bool go_to_sleep = false; //For the ISR
+volatile bool go_to_sleep = false; //For the ISR
+
+//BatteryAnalog
+#define BATTERY 33
+int BatLastChecked;
+int BatNumber;
+const int BatCheckInterval = 5*60*1000; //5mins
 
 //ESP-NOW Communication
 #define DEFAULT_DELAY_LAG 50 //communication delay
@@ -101,10 +113,10 @@ void init_matrix(){
 
 }
 
-void light_middle(int r, int g, int b){
+void light_up(int r, int g, int b, int index){
   //12 is the centre of the matrix
-  matrix.setPixelColor(12,matrix.Color(r,g,b));
-  matrix.show();
+  matrix.setPixelColor(index,matrix.Color(r,g,b));
+  
 }
 
 bool arr_is_valid(float diff, float *arr ){
@@ -135,6 +147,7 @@ void calibrate_IMU_MAX(){
   cal_roll = 0;
 
   while(1){
+    CheckSleep();
     M5.IMU.getAhrsData(&pitch,&roll,&yaw);
     
     angle_storage[curr_index] = roll;
@@ -149,7 +162,6 @@ void calibrate_IMU_MAX(){
 
       cal_roll = cal_roll / compare_no;
 
-      light_middle(0,100,0); //light up green when finished
       Serial.println("Calibration Done");
       Serial.printf("Offset roll:%.2f", cal_roll);
       Serial.println();
@@ -180,16 +192,80 @@ void Setup_DEEPSLEEP(){
 
 }
 
+int BatAmt(){
+  int number = analogRead(BATTERY);
+  int pd_out_map = map(number,0,4096,0,330); //Number reads from 0 to 4096 (12bit)
+  float voltage = pd_out_map / 100.0 * 2.0;
+
+  if(voltage > 3.9) return 3;
+  else if(voltage > 3.3) return 2;
+  else return 1;
+
+}
+
+void DisplayBat(int number){
+  matrix.clear();
+  ShowBattery();
+
+  switch(number){
+    case 3: //green 3 bar
+      light_up(0,100,0,11); light_up(0,100,0,12); light_up(0,100,0,13);
+      break;
+    case 2:
+      light_up(0,100,0,11); light_up(0,100,0,12); light_up(0,0,0,13);
+      break;
+    case 1:
+      light_up(100,0,0,11); light_up(0,0,0,12); light_up(0,0,0,13);
+      break;
+    case 0: //Clear the Middle, leave battery box
+      light_up(0,0,0,11); light_up(0,0,0,12); light_up(0,0,0,13);
+      break;
+    case -1: //White during connection
+      for(int i = 5; i < 20; i++){
+        light_up(50,50,50,i);
+      }
+      break;
+  }
+
+  matrix.show();
+}
+
+void ClearMatrix(){
+  matrix.clear();
+  matrix.show();  
+}
+
+void ShowBattery(){
+  for(int i = 5; i < 20; i++){
+    light_up(50,50,50,i);
+  }
+}
+
+void CheckSleep(){
+  if(go_to_sleep){
+    ClearMatrix(); //Turn off indicator and go to sleep
+    Serial.println("Going to sleep");
+    delay(1000);
+    esp_deep_sleep_start();
+  }  
+}
+
 void setup(){
-
-  init_matrix();
-  light_middle(100,0,0); //Red during startup
-
   M5.begin();
   M5.IMU.Init();
+  setCpuFrequencyMhz(CLOCK_SPEED);
+  
   Serial.begin(115200);
+  delay(100);
+  
+  go_to_sleep = false;
+  pinMode(BATTERY,INPUT);
 
-  //Setup_DEEPSLEEP();
+  init_matrix();
+  BatNumber = BatAmt();
+  BatLastChecked = millis();
+
+  Setup_DEEPSLEEP();
   
   SetUpESPNOW();
   Serial.println("ESP-NOW setup");
@@ -199,22 +275,27 @@ void setup(){
   WiFi.macAddress(message.slave_mac); // Copy the current mac address to mac 
   Serial.println(WiFi.macAddress()); 
   //memcpy(message.slave_mac,mac,6); //6 Values in the mac address so byte sioze of 6 
+  go_to_sleep = false;
+  Serial.print("But Value: ");
+  Serial.println(digitalRead(BUTTON));
+  Serial.print("go_to_sleep: ");
+  Serial.println(go_to_sleep);  
 
-  light_middle(0,0,100); //Set blue when callibration starts
-  calibrate_IMU_MAX();
-  light_middle(0,0,0); //Turn off when done
+  DisplayBat(BatNumber);
   
-  bool off = true;
+  calibrate_IMU_MAX();
 
+  bool off = false;
   while(!data_rcv){
+    CheckSleep();
     //Only start when message is recieved, send one pulse every second
     esp_now_send(master, (uint8_t *) &message, sizeof(message));
     if(off){
-      light_middle(0,0,100);
+      DisplayBat(-1);
       off = !off;
     }
     else{
-      light_middle(0,0,0);
+      ClearMatrix();
       off = !off;
     }
     delay(1000); 
@@ -233,10 +314,6 @@ void setup(){
   delay(delaylag); //at the start of the setup, give some lag time
   time_now = millis();
 
-  Serial.println("Setup complete");
-  Serial.println(go_to_sleep);
-
-
 
 }
 
@@ -245,8 +322,8 @@ void loop(){
   if(millis() - time_now >= sampling_period){
       
     //LED indicator
-    if(led_off) light_middle(0,100,0);
-    else light_middle(0,0,0);
+    if(led_off) DisplayBat(BatNumber);
+    else DisplayBat(0);
 
     //IMU calc and send
     M5.IMU.getAhrsData(&pitch,&roll,&yaw);
@@ -263,11 +340,11 @@ void loop(){
 
   }
 
-  if(go_to_sleep){
-    delay(1000);
-    light_middle(0,0,0); //Turn off indicator and go to sleep
-    Serial.println("Going to sleep");
-    esp_deep_sleep_start();
+  if(millis() - BatLastChecked >= BatCheckInterval){
+    BatNumber = BatAmt();
+    BatLastChecked = millis(); //Reset interval
   }
 
+
+  CheckSleep();
 }

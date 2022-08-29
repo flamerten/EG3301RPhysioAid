@@ -236,7 +236,9 @@ void setup(){
         light_up_n(0,0,0);
         delay(1000);
 
-        if(!Mac1Unknown) light_up_n(100,100,100,index = 0);
+        if(!Mac1Unknown){
+          light_up_n(100,100,100,0);
+        }
       
     }
     //Only continue when the mac addresses has been recieved
