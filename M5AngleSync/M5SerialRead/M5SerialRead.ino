@@ -227,10 +227,16 @@ void setup(){
     delay(1000);
 
     while( (Mac1Unknown == true) || (Mac2Unknown == true) ){
-      light_up_n(100,100,100);
-      delay(1000);
-      light_up_n(0,0,0);
-      delay(1000);
+        int r = 100;
+        int g = 100;
+        int b = 100;
+
+        light_up_n(100,100,100);
+        delay(1000);
+        light_up_n(0,0,0);
+        delay(1000);
+
+        if(!Mac1Unknown) light_up_n(100,100,100,index = 0);
       
     }
     //Only continue when the mac addresses has been recieved

@@ -4,4 +4,6 @@ This is a python file that reads data coming through the Serial port. In practic
 
 The data is read using pyserial, and then saved to a json file
 
+This JSON file is read by gui_python.py Use of tkinter and matplot lib for live update of data
+
 The arduino sketch is for testing, but basically prints data in a similar format, and then prints in through serial. However, this data is in integer format while the actual master outputs data through degrees.

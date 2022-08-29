@@ -16,6 +16,10 @@ Sampling rate defined from the messgae recieved
 bool led_off = true;
 Adafruit_NeoPixel matrix(LED_COUNT,LED_PIN , NEO_GRB + NEO_KHZ800);
 
+//Deep sleep button
+#define BUTTON 39
+#define BUTTON_PIN_BITMASK 0x8000000000 // 2^39 in hex
+bool go_to_sleep = false; //For the ISR
 
 //ESP-NOW Communication
 #define DEFAULT_DELAY_LAG 50 //communication delay
@@ -165,83 +169,105 @@ void calibrate_IMU_MAX(){
   
 }
 
+void IRAM_ATTR SLEEP_ISR(){
+  go_to_sleep = true;  
+}
 
+void Setup_DEEPSLEEP(){
+  pinMode(BUTTON,INPUT_PULLUP);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_39,LOW); //Wake up when button pulled low
+  attachInterrupt(BUTTON, SLEEP_ISR, FALLING); //Interrupt and go to sleep when button pulled low
+
+}
 
 void setup(){
-    M5.begin();
-    Serial.begin(115200);
-    M5.IMU.Init();
-    init_matrix();
-    light_middle(100,0,0);
 
-    delay(3000);
+  init_matrix();
+  light_middle(100,0,0); //Red during startup
 
-    SetUpESPNOW();
-    Serial.println("ESP-NOW setup");
+  M5.begin();
+  M5.IMU.Init();
+  Serial.begin(115200);
 
-    //Set Parameters not too sure why i can't do it before setup
-    //uint8_t mac[6];
-    WiFi.macAddress(message.slave_mac); // Copy the current mac address to mac 
-    Serial.println(WiFi.macAddress()); 
-    //memcpy(message.slave_mac,mac,6); //6 Values in the mac address so byte sioze of 6 
+  //Setup_DEEPSLEEP();
+  
+  SetUpESPNOW();
+  Serial.println("ESP-NOW setup");
 
-    light_middle(0,0,100); //Set blue when callibration starts
-    calibrate_IMU_MAX();
-    light_middle(0,0,0); //Turn off when done
-    
-    bool off = true;
-    while(!data_rcv){
-      esp_now_send(master, (uint8_t *) &message, sizeof(message));
-      if(off){
-        light_middle(0,0,100);
-        off = !off;
-      }
-      else{
-        light_middle(0,0,0);
-        off = !off;
-      }
-      delay(1000); //Only start when message is recieved, send one pulse every second
-      Serial.println("Pulse sent out");
+  //Set Parameters not too sure why i can't do it before setup
+  //uint8_t mac[6];
+  WiFi.macAddress(message.slave_mac); // Copy the current mac address to mac 
+  Serial.println(WiFi.macAddress()); 
+  //memcpy(message.slave_mac,mac,6); //6 Values in the mac address so byte sioze of 6 
+
+  light_middle(0,0,100); //Set blue when callibration starts
+  calibrate_IMU_MAX();
+  light_middle(0,0,0); //Turn off when done
+  
+  bool off = true;
+
+  while(!data_rcv){
+    //Only start when message is recieved, send one pulse every second
+    esp_now_send(master, (uint8_t *) &message, sizeof(message));
+    if(off){
+      light_middle(0,0,100);
+      off = !off;
     }
+    else{
+      light_middle(0,0,0);
+      off = !off;
+    }
+    delay(1000); 
+    //Serial.println("Pulse sent out");
+  }
 
-    Serial.println("Data Recieved");
+  Serial.println("Data Recieved");
 
-    //Set message variables to slave_no AFTER message recieved
+  //Set message variables to slave_no AFTER message recieved
+  if(message.roll_angle == 1) delaylag = 0;
+  else delaylag = DEFAULT_DELAY_LAG;
 
-    
+  message.roll_angle = -1; //reset roll angle
+  WiFi.macAddress(message.slave_mac); //reset mac slave number instead of the one recieved
+  
+  delay(delaylag); //at the start of the setup, give some lag time
+  time_now = millis();
 
-    if(message.roll_angle == 1) delaylag = 0;
-    else delaylag = DEFAULT_DELAY_LAG;
+  Serial.println("Setup complete");
+  Serial.println(go_to_sleep);
 
-    message.roll_angle = -1; //reset roll angle
-    WiFi.macAddress(message.slave_mac); //reset mac slave number instead of the one recieved
-    
-    delay(delaylag); //at the start of the setup, give some lag time
-    time_now = millis();
+
 
 }
 
 void loop(){
   //Serial.println(millis() - time_now);
-    if(millis() - time_now >= sampling_period){
-        
-        //LED indicator
-        if(led_off) light_middle(0,100,0);
-        else light_middle(0,0,0);
+  if(millis() - time_now >= sampling_period){
+      
+    //LED indicator
+    if(led_off) light_middle(0,100,0);
+    else light_middle(0,0,0);
 
-        //IMU calc and send
-        M5.IMU.getAhrsData(&pitch,&roll,&yaw);
-        Serial.print("Pitch: ");
-        Serial.println(roll);
-        Serial.print("Callibrated Ptich: ");
-        Serial.println(roll - cal_roll);
-        message.roll_angle = roll - cal_roll;
-        esp_now_send(master, (uint8_t *) &message, sizeof(message));
-        
-        //Reset variable
-        time_now = millis();
-        led_off = !led_off; 
+    //IMU calc and send
+    M5.IMU.getAhrsData(&pitch,&roll,&yaw);
+    Serial.print("Pitch: ");
+    Serial.println(roll);
+    Serial.print("Callibrated Ptich: ");
+    Serial.println(roll - cal_roll);
+    message.roll_angle = roll - cal_roll;
+    esp_now_send(master, (uint8_t *) &message, sizeof(message));
+    
+    //Reset variable
+    time_now = millis();
+    led_off = !led_off; 
 
-    }
+  }
+
+  if(go_to_sleep){
+    delay(1000);
+    light_middle(0,0,0); //Turn off indicator and go to sleep
+    Serial.println("Going to sleep");
+    esp_deep_sleep_start();
+  }
 
 }
