@@ -253,7 +253,7 @@ void CheckSleep(){
 void setup(){
   M5.begin();
   M5.IMU.Init();
-  setCpuFrequencyMhz(CLOCK_SPEED);
+  setCpuFrequencyMhz(CLOCKSPEED);
   
   Serial.begin(115200);
   delay(100);

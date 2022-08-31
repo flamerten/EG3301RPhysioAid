@@ -233,6 +233,7 @@ void setup(){
 
         light_up_n(100,100,100);
         delay(1000);
+        Serial.println("Listening for mac address");
         light_up_n(0,0,0);
         delay(1000);
 
@@ -254,17 +255,22 @@ void setup(){
 
 }
 
+int angle_knee;
 
 void loop(){
 
     lightup(colour_pos1,12);
     lightup(colour_pos2,0);
 
-    Serial.print(rolls_rcv[0]);
+    Serial.print(rolls_rcv[0]); //-180 to 180
     Serial.print(" ");
     Serial.print(rolls_rcv[1]);
     Serial.print(" ");
-    Serial.println(180 - abs(rolls_rcv[0] - rolls_rcv[1])); // use 180 as reference point
+    
+    angle_knee = int(abs(rolls_rcv[0] - rolls_rcv[1]) );
+    if(angle_knee > 180) angle_knee = 360 - angle_knee;
+    
+    Serial.println(angle_knee);   // use 180 as reference point
 
     delay(1); //slow together
 

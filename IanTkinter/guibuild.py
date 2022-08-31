@@ -23,6 +23,11 @@ start_time = time.time()
 matplotlib.use("TkAgg")
 style.use("seaborn-whitegrid")
 
+#FILE PATHS
+icon_file_path = os.path.join(sys.path[0],"AppSource","clienticon.ico")
+angle_file_path = os.path.join(sys.path[0],"AppSource","angle_json_data.json") 
+semg_file_path = os.path.join(sys.path[0],"AppSource","emg_json_data.json") 
+
 #creating a Figure for each graph im going to plot
 fig1 = Figure(figsize=(5,5), dpi=90, facecolor="#D9D9D9") #angle graph for p1
 fig2 = Figure(figsize=(5,5), dpi=90, facecolor="#D9D9D9") #emg graph for p1
@@ -65,12 +70,19 @@ def update_records(patient_no):
     global people_emg_data
     global timings
     
-    with open(take_from_home('angle_json_data.json'),'r') as json_file1:
-        angle_data = json.load(json_file1)
-        
-    angle = [int(angle_data['physio_data'][0]['Patient1']), int(angle_data['physio_data'][1]['Patient2']), int(angle_data['physio_data'][2]['Patient3'])]
+    try:
+        with open(angle_file_path,'r') as json_file1:
+            angle_data = json.load(json_file1)
 
-    with open(take_from_home('emg_json_data.json'),'r') as json_file2:
+        angle = [int(angle_data['physio_data'][0]['Patient1']), int(angle_data['physio_data'][1]['Patient2']), int(angle_data['physio_data'][2]['Patient3'])]
+    except:
+        print("unable to get angle from data")
+        angle = [0,0,0]
+        for i in range(len(patient_names)):
+            angle[i] = people_angle_data[patient_names[i]][-1]
+
+
+    with open(semg_file_path,'r') as json_file2:
         emg_data = json.load(json_file2)
 
     emg = [int(emg_data['physio_data'][0]['Patient1']), int(emg_data['physio_data'][1]['Patient2']), int(emg_data['physio_data'][2]['Patient3'])]     
@@ -78,20 +90,16 @@ def update_records(patient_no):
     for i in range(len(patient_names)):
         people_angle_data[patient_names[i]].append(angle[i])
         people_emg_data[patient_names[i]].append(emg[i])
-        timings[patient_names[i]].append(int(time.time()-start_time))
-
-    #people_angle_data["Patient2"].append(angle[1])
-    #people_emg_data["Patient2"].append(emg[1])
-    #timings["Patient2"].append(timings["Patient2"][-1] + 1)
-
-    #people_angle_data["Patient3"].append(angle[2])
-    #people_emg_data["Patient3"].append(emg[2])
-    #timings["Patient3"].append(timings["Patient3"][-1] + 1)
+        timings[patient_names[i]].append(round(time.time()-start_time,2))
     
 
     people_angle_data[patient_no] = people_angle_data[patient_no][-500:] #last n data
     people_emg_data[patient_no] = people_emg_data[patient_no][-500:] #last n data
     timings[patient_no] = timings[patient_no][-500:]
+
+
+
+
 
 def a_animateshort(patient_no,fig_object):
     update_records(patient_no)
@@ -104,7 +112,6 @@ def a_animateshort(patient_no,fig_object):
     fig_object.clear()
     fig_object.set_ylim(0,200)
     fig_object.plot(xList1[-100:-1], yList1[-100:-1])
-
 
 def e_animateshort(patient_no,fig_object):
     update_records(patient_no)
@@ -160,7 +167,7 @@ class PhysioCmdr(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         tk.Tk.wm_title(self, "PhysioCmdr")
-        tk.Tk.iconbitmap(self, default=take_from_home("clienticon.ico"))
+        tk.Tk.iconbitmap(self, default=take_from_home(icon_file_path))
 
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand = True)
@@ -409,18 +416,24 @@ class DetailPage3(tk.Frame):
 app = PhysioCmdr()
 app.geometry("1024x768")
 
-UPDinterval = 1000
+UPDinterval = 500
 ani1 = animation.FuncAnimation(fig1, animate_func1, interval=UPDinterval)
 ani2 = animation.FuncAnimation(fig2, animate_func2, interval=UPDinterval)
+"""
 ani3 = animation.FuncAnimation(fig3, animate_func3, interval=UPDinterval)
 ani4 = animation.FuncAnimation(fig4, animate_func4, interval=UPDinterval)
 ani5 = animation.FuncAnimation(fig5, animate_func5, interval=UPDinterval)
 ani6 = animation.FuncAnimation(fig6, animate_func6, interval=UPDinterval)
+"""
 ani7 = animation.FuncAnimation(fig7, animate_func1_a, interval=UPDinterval)
 ani8 = animation.FuncAnimation(fig8, animate_func1_e, interval=UPDinterval)
+
+"""
 ani9 = animation.FuncAnimation(fig9, animate_func2_a, interval=UPDinterval)
 ani10 = animation.FuncAnimation(fig10, animate_func2_e, interval=UPDinterval)
 ani11 = animation.FuncAnimation(fig11, animate_func3_a, interval=UPDinterval)
 ani12 = animation.FuncAnimation(fig12, animate_func3_e, interval=UPDinterval)
+"""
+
 #app.resizable(False, False)
 app.mainloop()

@@ -6,6 +6,7 @@
 #define BRIGHTNESS 100 //set as 0 if you do not want to show the indicator
 bool led_off = true;
 Adafruit_NeoPixel matrix(LED_COUNT,LED_PIN , NEO_GRB + NEO_KHZ800);
+int x = 0.1;
 
 void init_matrix(){
   //ensure the matrix behind is turned off, reduce power usage
@@ -37,12 +38,14 @@ void loop() {
   Serial.print(" ");
   Serial.print(random(0,180));
   Serial.print(" ");
-  Serial.println(random(0,180));
+  Serial.println(int(abs(sin(x)) * 180));
   if(led_off) light_middle(0,0,100);
   else light_middle(0,0,0);
 
   led_off = !led_off;
-  delay(500);
+  delay(100);
+
+  x++;
   
   
   

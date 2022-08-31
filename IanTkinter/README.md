@@ -1,9 +1,17 @@
-# Random Number Gen
+# Ian Tkinter
 
-This is a python file that reads data coming through the Serial port. In practice, we will connect the master M5 to the RPI, and the RPI runs this code to read data coming through.
+This folder shows Ian's work on using Tkinter to display data coming from the M5 with the connection through serial port
 
-The data is read using pyserial, and then saved to a json file
+`ReadSerialData.py` is a python file that reads data coming from the serial port of the M5. It assumes that the data is coming in the format >  `angle angle angle`, with COM14 as the port. The data is read using pyserial and saved to a json file, `angle_json_data.json`
 
-This JSON file is read by gui_python.py Use of tkinter and matplot lib for live update of data
+The JSON file is read continuously by the file `guibuild.py` it also uses Tkinter and Matplotlib to build a GUI to show patient knee angle (`angle_json_data`) and SEMG data (`emg_json_data.json`).
 
-The arduino sketch is for testing, but basically prints data in a similar format, and then prints in through serial. However, this data is in integer format while the actual master outputs data through degrees.
+The arduino folder `RandomNumberGen` is used to generate random numbers for testing the use of Serial Data
+
+#
+## Updates
+
+### 31/08/2022
+Had some succeess in reading raw data, combining the data read from `M5AngleSync`. However, there was some issues in writing to the json file. This was solved with `try except`. The reason could be `guibuild.py` reads the json file at the exact same time that `ReadSerialData.py` writes to the file. Might need to reduce the frequency of updating the JSON file. 
+
+Had some issues with speed as well, there are 6 graphs and each are updating at its own time. This can be pretty slow because its 6 seperate instances.
