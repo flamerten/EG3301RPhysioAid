@@ -198,7 +198,7 @@ int BatAmt(){
   float voltage = pd_out_map / 100.0 * 2.0;
 
   if(voltage > 3.9) return 3;
-  else if(voltage > 3.3) return 2;
+  else if(voltage > 3.0) return 2; //by right 3.2V for low battery but i suspect is not very accurate so i minus 0.2 form the actual value
   else return 1;
 
 }

@@ -3,16 +3,13 @@ import serial
 import sys, os #allow keyboard interrupt to exit
 import json
 
-import datetime as dt
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+#File that is imported by GUIBuild to read Serial Data
 
 def take_from_home(file_name):
     return os.path.join(sys.path[0],file_name) #look for file in the current directory
 
 m5 = serial.Serial(port='COM14', baudrate=115200, timeout=.1) #the com port depends on the computer
 file_name = take_from_home('angle_json_data.json')
-
 
 try:
     with open(file_name,'r') as json_file:

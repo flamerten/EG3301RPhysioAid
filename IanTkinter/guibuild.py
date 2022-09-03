@@ -9,14 +9,8 @@ from matplotlib import style
 import tkinter as tk
 from tkinter import ttk, Tk, Canvas, Entry, Text, Button
 
-import json
-import random
-import time
-import os
-import sys
+import json, time, os, sys
 
-def take_from_home(file_name):
-    return os.path.join(sys.path[0],file_name) #look for file in the current directory
 
 start_time = time.time()
 
@@ -65,10 +59,13 @@ for pt in patient_names:
     people_emg_data[pt] = [0]
     timings[pt] = [0]
 
+
+
 def update_records(patient_no):
     global people_angle_data
     global people_emg_data
     global timings
+    
     
     try:
         with open(angle_file_path,'r') as json_file1:
@@ -80,6 +77,7 @@ def update_records(patient_no):
         angle = [0,0,0]
         for i in range(len(patient_names)):
             angle[i] = people_angle_data[patient_names[i]][-1]
+    
 
 
     with open(semg_file_path,'r') as json_file2:
@@ -96,8 +94,6 @@ def update_records(patient_no):
     people_angle_data[patient_no] = people_angle_data[patient_no][-500:] #last n data
     people_emg_data[patient_no] = people_emg_data[patient_no][-500:] #last n data
     timings[patient_no] = timings[patient_no][-500:]
-
-
 
 
 
@@ -167,13 +163,12 @@ class PhysioCmdr(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         tk.Tk.wm_title(self, "PhysioCmdr")
-        tk.Tk.iconbitmap(self, default=take_from_home(icon_file_path))
+        tk.Tk.iconbitmap(self, default=(icon_file_path))
 
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand = True)
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
-
         self.frames = {}
 
         for F in (Overview, DetailPage1, DetailPage2, DetailPage3):
@@ -416,7 +411,10 @@ class DetailPage3(tk.Frame):
 app = PhysioCmdr()
 app.geometry("1024x768")
 
-UPDinterval = 500
+UPDinterval = 100
+#Patient 1 SEMG Data and Joint Angle
+
+
 ani1 = animation.FuncAnimation(fig1, animate_func1, interval=UPDinterval)
 ani2 = animation.FuncAnimation(fig2, animate_func2, interval=UPDinterval)
 """
@@ -437,3 +435,4 @@ ani12 = animation.FuncAnimation(fig12, animate_func3_e, interval=UPDinterval)
 
 #app.resizable(False, False)
 app.mainloop()
+print("App has finished running")
