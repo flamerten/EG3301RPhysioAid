@@ -7,10 +7,16 @@ import matplotlib.animation as animation
 from matplotlib import style
 
 import tkinter as tk
-from tkinter import ttk, Tk, Canvas, Entry, Text, Button
+from tkinter import E, ttk, Tk, Canvas, Entry, Text, Button
 
-import json, time, os, sys
+import json
+import random
+import time
+import os
+import sys
 
+
+import ReadSerialData
 
 start_time = time.time()
 
@@ -59,14 +65,14 @@ for pt in patient_names:
     people_emg_data[pt] = [0]
     timings[pt] = [0]
 
-
-
 def update_records(patient_no):
     global people_angle_data
     global people_emg_data
     global timings
     
-    
+    #Commented out the part about reading the json file, directly retrieve data from the Serial Monitor
+
+    """
     try:
         with open(angle_file_path,'r') as json_file1:
             angle_data = json.load(json_file1)
@@ -77,7 +83,22 @@ def update_records(patient_no):
         angle = [0,0,0]
         for i in range(len(patient_names)):
             angle[i] = people_angle_data[patient_names[i]][-1]
+    """
     
+    try:
+        number = ReadSerialData.read_data()
+        if number == "":
+            raise Exception("Nothing in Reading Serial Data")
+        else:
+            angle = [int(number.split(" ")[2]),0,0]
+    except:
+        print("Problem with Serial Read")
+        angle = [0,0,0]
+        for i in range(len(patient_names)):
+            patient_ang = people_angle_data[patient_names[i]][-1]
+            angle[i] = patient_ang
+    
+
 
 
     with open(semg_file_path,'r') as json_file2:
@@ -94,6 +115,8 @@ def update_records(patient_no):
     people_angle_data[patient_no] = people_angle_data[patient_no][-500:] #last n data
     people_emg_data[patient_no] = people_emg_data[patient_no][-500:] #last n data
     timings[patient_no] = timings[patient_no][-500:]
+
+
 
 
 
@@ -163,12 +186,13 @@ class PhysioCmdr(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         tk.Tk.wm_title(self, "PhysioCmdr")
-        tk.Tk.iconbitmap(self, default=(icon_file_path))
+        tk.Tk.iconbitmap(self, default=icon_file_path)
 
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand = True)
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
+
         self.frames = {}
 
         for F in (Overview, DetailPage1, DetailPage2, DetailPage3):
@@ -411,10 +435,7 @@ class DetailPage3(tk.Frame):
 app = PhysioCmdr()
 app.geometry("1024x768")
 
-UPDinterval = 100
-#Patient 1 SEMG Data and Joint Angle
-
-
+UPDinterval = 200 #I found that an update rate of 100ms is really too high
 ani1 = animation.FuncAnimation(fig1, animate_func1, interval=UPDinterval)
 ani2 = animation.FuncAnimation(fig2, animate_func2, interval=UPDinterval)
 """
@@ -435,4 +456,3 @@ ani12 = animation.FuncAnimation(fig12, animate_func3_e, interval=UPDinterval)
 
 #app.resizable(False, False)
 app.mainloop()
-print("App has finished running")
