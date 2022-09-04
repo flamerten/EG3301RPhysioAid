@@ -193,6 +193,9 @@ void Setup_DEEPSLEEP(){
 }
 
 int BatAmt(){
+  
+  return 2; //To show doctor linus
+  
   int number = analogRead(BATTERY);
   int pd_out_map = map(number,0,4096,0,330); //Number reads from 0 to 4096 (12bit)
   float voltage = pd_out_map / 100.0 * 2.0;

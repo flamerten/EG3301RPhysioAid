@@ -239,6 +239,9 @@ void setup(){
 
         if(!Mac1Unknown){
           light_up_n(100,100,100,0);
+          Serial.println("Mac1 Found:");
+          PrintMac(slave1);
+          Serial.println();
         }
       
     }
@@ -256,22 +259,23 @@ void setup(){
 }
 
 int angle_knee;
+int time_now = millis();
 
 void loop(){
 
     lightup(colour_pos1,12);
     lightup(colour_pos2,0);
-
-    Serial.print(rolls_rcv[0]); //-180 to 180
-    Serial.print(" ");
-    Serial.print(rolls_rcv[1]);
-    Serial.print(" ");
     
-    angle_knee = int(abs(rolls_rcv[0] - rolls_rcv[1]) );
-    if(angle_knee > 180) angle_knee = 360 - angle_knee;
-    
-    Serial.println(angle_knee);   // use 180 as reference point
-
-    delay(1); //slow together
+    angle_knee = int( abs(rolls_rcv[0] - rolls_rcv[1]) + 180 ) ;
+    angle_knee = angle_knee % 180; //So that angle_knee is <= 180
+        
+    if(millis() - time_now >= SAMPLING_PERIOD){
+      Serial.print(rolls_rcv[0]); //-180 to 180
+      Serial.print(" ");
+      Serial.print(rolls_rcv[1]);
+      Serial.print(" ");
+      Serial.println(angle_knee);   // use 180 as reference point
+      time_now = millis();
+    }
 
 }
