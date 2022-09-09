@@ -9,6 +9,8 @@ Sampling rate defined from the messgae recieved
 #include <esp_now.h>
 #include <WiFi.h>
 
+const bool callibrate = false; //ignore callibration
+
 //On board LED matrix
 #define LED_COUNT 25
 #define LED_PIN   27
@@ -38,7 +40,7 @@ const int BatCheckInterval = 5*60*1000; //5mins
 #define CALIBRATE_LAG 5000 //Let the IMU do gradient descent for N ms at least
 uint8_t master[] = {0x4C,0x75,0x25,0xC4,0xFA,0xF4}; //GREY
 bool data_rcv = false;
-int sampling_period = 10000000; //Changed on data rcv > master sends the sampling period he wants
+int sampling_period = 100; //Changed on data rcv > master sends the sampling period he wants
 int delaylag;
 
 //Use the same float for all 3 devices, Reduce complexity(?)
@@ -55,7 +57,7 @@ esp_now_peer_info_t peerInfo;
 //IMU
 #define CALIBRATION_LAG 100
 float pitch, roll, yaw;
-float cal_roll;
+float cal_roll, final_roll, final_roll_mapped;
 unsigned long time_now = millis();
 const uint8_t compare_no = 20; //compare n different readings during calibration
 const uint8_t difference = 1; //1 degrees diff between readings = stabalise
@@ -98,6 +100,7 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
     //Data is only recieved once to init sampling
     
     memcpy(&message, incomingData, sizeof(message)); //Save data to struct
+    WiFi.macAddress(message.slave_mac); // reset message to be own mac address instead of the master one
     data_rcv = true; // Flag to start sampling
     sampling_period = message.sampling_rate;
 
@@ -182,6 +185,7 @@ void calibrate_IMU_MAX(){
 }
 
 void IRAM_ATTR SLEEP_ISR(){
+  //GPIO interrupt that changes the variable go to sleep
   go_to_sleep = true;  
 }
 
@@ -279,14 +283,10 @@ void setup(){
   Serial.println(WiFi.macAddress()); 
   //memcpy(message.slave_mac,mac,6); //6 Values in the mac address so byte sioze of 6 
   go_to_sleep = false;
-  Serial.print("But Value: ");
-  Serial.println(digitalRead(BUTTON));
-  Serial.print("go_to_sleep: ");
-  Serial.println(go_to_sleep);  
 
   DisplayBat(BatNumber);
   
-  calibrate_IMU_MAX();
+  if(callibrate) calibrate_IMU_MAX();
 
   bool off = false;
   while(!data_rcv){
@@ -302,7 +302,7 @@ void setup(){
       off = !off;
     }
     delay(1000); 
-    //Serial.println("Pulse sent out");
+    Serial.println("Pulse sent out");
   }
 
   Serial.println("Data Recieved");
@@ -312,7 +312,6 @@ void setup(){
   else delaylag = DEFAULT_DELAY_LAG;
 
   message.roll_angle = -1; //reset roll angle
-  WiFi.macAddress(message.slave_mac); //reset mac slave number instead of the one recieved
   
   delay(delaylag); //at the start of the setup, give some lag time
   time_now = millis();
@@ -330,11 +329,22 @@ void loop(){
 
     //IMU calc and send
     M5.IMU.getAhrsData(&pitch,&roll,&yaw);
-    Serial.print("Pitch: ");
-    Serial.println(roll);
-    Serial.print("Callibrated Ptich: ");
-    Serial.println(roll - cal_roll);
-    message.roll_angle = roll - cal_roll;
+    final_roll = roll - cal_roll;
+
+    if(final_roll > 180 ) final_roll_mapped = (final_roll - 180.0) * -1.0; //go to -ve
+    else if(final_roll < -180) final_roll_mapped = (final_roll + 180.0) * -1.0; //go to +ve
+    else final_roll_mapped = final_roll;
+
+    /*
+    Serial.print("Roll: ");
+    Serial.print(roll);
+    Serial.print(" Call_roll: ");
+    Serial.print(final_roll);
+    Serial.print(" Final_cal_Roll: ");
+    Serial.println(final_roll_mapped);
+    */
+
+    message.roll_angle = roll;
     esp_now_send(master, (uint8_t *) &message, sizeof(message));
     
     //Reset variable

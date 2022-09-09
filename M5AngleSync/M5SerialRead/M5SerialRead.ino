@@ -33,13 +33,15 @@ uint8_t slave2[6];
 bool Mac1Unknown = true;
 bool Mac2Unknown = true;
 
+int last_sent_timings[] = {millis(),millis()}; //Use this to check if a certain device has disconnected or not
+
+
 //Use the same float for all 3 devices
 //Reduce complexity(?)
 typedef struct struct_message{
     int sampling_rate;
     uint8_t slave_mac[6];
     float roll_angle;
-
 } struct_message; //define struct and then initalise it
 
 //Declare message to be sent over, and the slave info
@@ -112,8 +114,8 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
     if(Mac1Unknown){
         memcpy(slave1,message.slave_mac,6);
         Mac1Unknown = false;
-        //Serial.print("Mac 1 saved. Mac address is ");
-        //PrintMac(slave1);
+        Serial.print("Mac 1 saved. Mac address is ");
+        PrintMac(slave1);
         //Serial.print(Mac1Unknown);
     }
     else if(Mac2Unknown){
@@ -122,8 +124,8 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
           return;
         }
         Mac2Unknown = false; 
-        //Serial.print("Mac 2 saved. Mac address is ");
-        //PrintMac(slave2);     
+        Serial.print("Mac 2 saved. Mac address is ");
+        PrintMac(slave2);     
         //Serial.print(Mac2Unknown);
     }
     else{
@@ -131,13 +133,15 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
         if(IsMacSame(message.slave_mac,slave1)){
             if(colour_pos1 >= 3) colour_pos1 = 0;
             else colour_pos1++;
-            rolls_rcv[0] = message.roll_angle; 
+            rolls_rcv[0] = message.roll_angle;
+            last_sent_timings[0] = millis();
 
         }
         else if(IsMacSame(message.slave_mac,slave2)) {
             if(colour_pos2 >= 3) colour_pos2 = 0;
             else colour_pos2++; 
             rolls_rcv[1] = message.roll_angle; 
+            last_sent_timings[1] = millis();
         }
         else Serial.println("Unknown MAC recieved");
     }
@@ -184,6 +188,14 @@ void start_sampling(){
 
 }
 
+void(* resetFunc) (void) = 0; //declare reset function @ address 0
+
+void CheckReset(){
+  for(int i = 0; i < 2; i++){
+    if(millis() - last_sent_timings[i] >= 4000) resetFunc();
+  }
+}
+
 void init_matrix(){
   //ensure the matrix behind is turned off, reduce power usage
   //however, this can be useeful as an indicator
@@ -224,13 +236,11 @@ void setup(){
 
     SetUpESPNOW_RCV();
     Serial.println("M5 Serial Receive Set up");
+    Mac1Unknown = true;
+    Mac2Unknown = true;
     delay(1000);
 
     while( (Mac1Unknown == true) || (Mac2Unknown == true) ){
-        int r = 100;
-        int g = 100;
-        int b = 100;
-
         light_up_n(100,100,100);
         delay(1000);
         Serial.println("Listening for mac address");
@@ -255,6 +265,9 @@ void setup(){
     light_up_n(0,0,0);
     //Sdelay(1000);
 
+    last_sent_timings[0] = millis();
+    last_sent_timings[1] = millis();
+
 
 }
 
@@ -265,9 +278,13 @@ void loop(){
 
     lightup(colour_pos1,12);
     lightup(colour_pos2,0);
+
     
-    angle_knee = int( abs(rolls_rcv[0] - rolls_rcv[1]) + 180 ) ;
-    angle_knee = angle_knee % 180; //So that angle_knee is <= 180
+    //angle_knee = int( abs(rolls_rcv[0] - rolls_rcv[1]) + 180 ) ;
+    //angle_knee = angle_knee % 180; //So that angle_knee is <= 180
+
+    angle_knee = abs(180 - int(abs(rolls_rcv[0] - rolls_rcv[1]) ));
+    //if(angle_knee > 180) angle_knee = 360 - angle_knee;
         
     if(millis() - time_now >= SAMPLING_PERIOD){
       Serial.print(rolls_rcv[0]); //-180 to 180
@@ -277,5 +294,7 @@ void loop(){
       Serial.println(angle_knee);   // use 180 as reference point
       time_now = millis();
     }
+
+    CheckReset();
 
 }
