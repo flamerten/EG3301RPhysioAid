@@ -11,7 +11,7 @@
 
 
 #define DELAY 50 //Number of MS between each sending
-const bool USE_LED = false; //Change this if you want the LEDS
+const bool USE_LED = true; //Change this if you want the LEDS
 
 
 

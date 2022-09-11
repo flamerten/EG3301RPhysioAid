@@ -13,10 +13,21 @@ import json
 import random
 import time
 import os
-import sys
+import sys, serial
 
 
 import ReadSerialData
+
+PORT = ReadSerialData.find_MCU_port()
+if(PORT == 'COM0'):
+    print("No valid usb device connected")
+    sys.exit() #exit
+
+BAUDRATE = 115200
+TIMEOUT = 0.1
+
+
+serial_mcu = serial.Serial(port = PORT, baudrate=BAUDRATE, timeout=TIMEOUT) #defined above
 
 start_time = time.time()
 
@@ -86,11 +97,22 @@ def update_records(patient_no):
     """
     
     try:
-        number = ReadSerialData.read_data()
-        if number == "":
-            raise Exception("Nothing in Reading Serial Data")
-        else:
-            angle = [int(number.split(" ")[2]),0,0]
+        mydata = ""
+        serial_mcu.reset_input_buffer() #remove all the data that was left behind
+        time_now = time.time()
+
+        while(mydata == ""):
+            mydata = ReadSerialData.read_data(serial_mcu)
+            if(len(mydata.split(" ")) != 3):
+                mydata = ""
+            elif (time.time() - time_now >= 1):
+                print("Timeout")
+                raise Exception
+
+        lis = mydata.split(" ")
+        angle_read = int(float(lis[2]))
+        #print(angle_read)
+        angle = [angle_read,0,0]
     except:
         print("Problem with Serial Read")
         angle = [0,0,0]
@@ -195,7 +217,7 @@ class PhysioCmdr(tk.Tk):
 
         self.frames = {}
 
-        for F in (Overview, DetailPage1, DetailPage2, DetailPage3):
+        for F in (Overview, DetailPage1): # DetailPage2, DetailPage3):
 
             frame = F(container, self)
 
@@ -340,6 +362,7 @@ class DetailPage1(tk.Frame):
         #Live text for current second graph value
         canvas.create_text(980.0, 568.0, anchor="ne", text="14.5"+"%", fill="#000000", font=("Inter", 48 * -1))
 
+
 class DetailPage2(tk.Frame):
 
     def __init__(self, parent, controller):
@@ -432,24 +455,32 @@ class DetailPage3(tk.Frame):
         #Live text for current second graph value
         canvas.create_text(980.0, 568.0, anchor="ne", text="14.5"+"%", fill="#000000", font=("Inter", 48 * -1))
 
+
 app = PhysioCmdr()
 app.geometry("1024x768")
 
 UPDinterval = 200 #I found that an update rate of 100ms is really too high
+
+#Only display one person viewpoint
+
 ani1 = animation.FuncAnimation(fig1, animate_func1, interval=UPDinterval)
-ani2 = animation.FuncAnimation(fig2, animate_func2, interval=UPDinterval)
+#ani2 = animation.FuncAnimation(fig2, animate_func2, interval=UPDinterval)
+
+#ani3 = animation.FuncAnimation(fig3, animate_func3, interval=UPDinterval)
+#ani4 = animation.FuncAnimation(fig4, animate_func4, interval=UPDinterval)
+
 """
-ani3 = animation.FuncAnimation(fig3, animate_func3, interval=UPDinterval)
-ani4 = animation.FuncAnimation(fig4, animate_func4, interval=UPDinterval)
 ani5 = animation.FuncAnimation(fig5, animate_func5, interval=UPDinterval)
 ani6 = animation.FuncAnimation(fig6, animate_func6, interval=UPDinterval)
 """
 ani7 = animation.FuncAnimation(fig7, animate_func1_a, interval=UPDinterval)
-ani8 = animation.FuncAnimation(fig8, animate_func1_e, interval=UPDinterval)
+#ani8 = animation.FuncAnimation(fig8, animate_func1_e, interval=UPDinterval)
+
+
+#ani9 = animation.FuncAnimation(fig9, animate_func2_a, interval=UPDinterval)
+#ani10 = animation.FuncAnimation(fig10, animate_func2_e, interval=UPDinterval)
 
 """
-ani9 = animation.FuncAnimation(fig9, animate_func2_a, interval=UPDinterval)
-ani10 = animation.FuncAnimation(fig10, animate_func2_e, interval=UPDinterval)
 ani11 = animation.FuncAnimation(fig11, animate_func3_a, interval=UPDinterval)
 ani12 = animation.FuncAnimation(fig12, animate_func3_e, interval=UPDinterval)
 """

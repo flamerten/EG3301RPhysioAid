@@ -83,7 +83,7 @@ if __name__ == "__main__": #Only if file is run
             print("We have an error, closing serial port", PORT)
             sys.exit()
 
-        time.sleep(.5)
+        time.sleep(0.1)
         #sleep for 1s (not too sure if i need this, but it might help with frequency issues
         #remember to flush the input buffer
 
