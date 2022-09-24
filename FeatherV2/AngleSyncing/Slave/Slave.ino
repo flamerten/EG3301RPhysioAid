@@ -131,7 +131,7 @@ void CheckBattery(bool check_now){
         //Confusion
 
         else if(bat_percentage > 75) onboard_pixel.setPixelColor(0,onboard_pixel.Color(0,100,0)); //Green
-        else if(bat_percentage > 40)  onboard_pixel.setPixelColor(0,onboard_pixel.Color(0,100,100)); //Yellow
+        else if(bat_percentage > 40)  onboard_pixel.setPixelColor(0,onboard_pixel.Color(100,100,0)); //Yellow
         else onboard_pixel.setPixelColor(0,onboard_pixel.Color(100,0,0)); //Red
 
         onboard_pixel.show();
