@@ -1,15 +1,17 @@
 /*
- * This Sketch is the master, it recieves data from the slave and sends it over
- * to the usb M5
- * Note that the battery indicator and the pogo pin charging is removed
+ * Master, have some solder from vibrator
+ * NO VIBRATION
+ * Still use roll as it has the largest range of angle but change the data collection method
  * 
  */
 
 #include <MadgwickAHRS.h> //https://github.com/arduino-libraries/MadgwickAHRS
 #include <Adafruit_LSM6DSOX.h>
+#include <Adafruit_LC709203F.h> //Bat indicator
 #include <Adafruit_NeoPixel.h>
 #include <esp_now.h>
 #include <WiFi.h>
+
 
 //Feather
 #define NEOPIXEL_I2C_POWER 2
@@ -17,15 +19,15 @@
 bool led_on = true;
 
 //Deep sleep
-#define SLEEP_BUTTON 38 
-#define BUTTON_PIN_BITMASK 0x8000000000 // 2^39 in hex
+#define SLEEP_BUTTON 26 //A0
 volatile bool go_to_sleep = false; //For the ISR
 
 //ESP-NOW
-#define PATIENT_NO 1 //Distiguish between patient nos
+#define PATIENT_NO 0 //Distiguish between patient nos
 uint8_t master[] = {0x4C,0x75,0x25,0xA1,0x84,0x20}; //USB M5 Matrix
 bool data_ready = false; //Flag when data is recieved
-float slave_angle, joint_angle;
+float slave_angle;
+float joint_angle = 180;
 float roll, pitch;
 
 typedef struct struct_message{
@@ -33,8 +35,6 @@ typedef struct struct_message{
     uint8_t patient_no;
     //The slave sends angle to master, master calculates joint angle and then 
     //Sends that to the master
-
-
     //Use mac address to distinguish different wearables // No need this
 } struct_message; //define struct and then initalise it
 
@@ -46,15 +46,6 @@ Adafruit_LSM6DSOX sox; //declare sox object
 sensors_event_t accel, gyro, temp;
 unsigned long int imu_read_time = millis();
 
-//Battery
-Adafruit_NeoPixel onboard_pixel(1, 0, NEO_GRB + NEO_KHZ800);
-int bat_percentage; float bat_voltage; int bat_reading;
-#define BRIGHTNESS 20
-#define ANALOG_BAT 35 //Analog built in to measure bat
-const int BAT_TIME_DELAY_MILLIS = 1000 * 60;
-int r_neo, g_neo, b_neo;
-unsigned long int last_bat_query_time = 0;
-
 //Magdwick 
 Madgwick filter;
 #define SAMPLE_FREQ 10
@@ -65,36 +56,50 @@ const uint16_t IMU_TIME_DELAY_MILLIS = 1.0/SAMPLE_FREQ * 1000;
 float ax, ay, az;
 float gx, gy, gz;
 
+//Battery Indicator
+Adafruit_NeoPixel onboard_pixel(1, 0, NEO_GRB + NEO_KHZ800); //Use on board neopixel
+#define BRIGHTNESS 50
+
+//Batt Measurement
+Adafruit_LC709203F lc;
+unsigned const int BAT_TIME_DELAY_MILLIS = 5 * 60 * 1000; //Query every 5 mins
+const float CUT_OFF_VOLTAGE = 3.3; //Source: https://forums.adafruit.com/viewtopic.php?f=19&p=545995 
+#define USE_CUTOFF 0 //Dont use the cut off voltage
+unsigned long int last_bat_query_time = 0;
+int bat_percentage; float bat_voltage;
+
+
 void(* resetFunc) (void) = 0; //declare reset function @ address 0
 
 void CheckBattery(bool check_now){
-    //Simple Bat Comparisons
-    //Use check_value to check_value at the start;
+    //Check_now used to just do a bat check during startup, from then on its false, until query time
+    //First -> Check voltage, if too low shut off battery
+    //Second, if query time, change the colour of the pixel
     
-    bat_reading = map(analogRead(ANALOG_BAT),0,4096,0,33) *2; //0 - 33 ( 0 - 3.3 since map is int)
-    bat_voltage = bat_reading / 10.0;
+    bat_voltage = lc.cellVoltage();
 
-    if(bat_voltage <= 3.4){
+    if(bat_voltage <= CUT_OFF_VOLTAGE && USE_CUTOFF){
         Serial.print("LOW BAT VOLTAGE: ");
         Serial.println(bat_voltage);
         go_to_sleep = true;
         return;
     }
-
     
 
-    if( (millis() - last_bat_query_time >= BAT_TIME_DELAY_MILLIS)|| check_now){
-        if(bat_voltage >= 3.9)       {r_neo = 0;   g_neo = 100; b_neo = 0; }  //Green
-        else if(bat_voltage >= 3.6)  {r_neo = 100; g_neo = 100; b_neo = 0; }  //Yellow
-        else                         {r_neo = 100; g_neo = 0;   b_neo = 0; }  //Red
+    if( ( (millis() - last_bat_query_time) >= BAT_TIME_DELAY_MILLIS) || check_now){
+        
+        bat_percentage = round(lc.cellPercent());
+        if(bat_percentage == 100 && check_now) onboard_pixel.setPixelColor(0,onboard_pixel.Color(50,50,50));
+        //White signify full charge, only signify full charge at the beginning to avoid
+        //Confusion
+        else if(bat_percentage > 75) onboard_pixel.setPixelColor(0,onboard_pixel.Color(0,100,0)); //Green
+        else if(bat_percentage > 40)  onboard_pixel.setPixelColor(0,onboard_pixel.Color(100,100,0)); //Yellow
+        else onboard_pixel.setPixelColor(0,onboard_pixel.Color(100,0,0)); //Red
 
-        Serial.printf("The battery volt is %f",bat_voltage);
-        Serial.println();
+        onboard_pixel.show();
+
+        Serial.print("Bat Level is "); Serial.print(bat_percentage); Serial.println("%");
     }
-    
-    onboard_pixel.setPixelColor(0,onboard_pixel.Color(r_neo,g_neo,b_neo)); 
-    onboard_pixel.show();
-    last_bat_query_time = millis();
 
 }
 
@@ -105,7 +110,7 @@ void IRAM_ATTR SLEEP_ISR(){
 
 void Setup_DEEPSLEEP(){
   pinMode(SLEEP_BUTTON,INPUT_PULLUP);
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_38,LOW); //Wake up when button pulled low
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_26,LOW); //Wake up when button pulled low
   attachInterrupt(SLEEP_BUTTON, SLEEP_ISR, FALLING); //Interrupt and go to sleep when button pulled low
 
 }
@@ -163,16 +168,16 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
 
 void CheckToSend(){
     if(data_ready){
-        //joint_angle = abs(180 - int(abs(slave_angle - roll)));
-        joint_angle = abs(180 - int(abs(slave_angle - pitch)));
-        message.angle = joint_angle;
-        esp_now_send(master, (uint8_t *) &message, sizeof(message));
-        data_ready = false;
-        Serial.print(slave_angle);
-        Serial.print(" ");
-        Serial.print(roll);
-        Serial.print(" ");
-        Serial.println(joint_angle);
+      //Use roll
+      joint_angle = abs(180 - int(abs(slave_angle - roll)));
+      message.angle = joint_angle;
+      esp_now_send(master, (uint8_t *) &message, sizeof(message));
+      data_ready = false;
+      Serial.print(slave_angle);
+      Serial.print(" ");
+      Serial.print(roll);
+      Serial.print(" ");
+      Serial.println(joint_angle);
     }
 }
 
@@ -190,7 +195,10 @@ void get_readings(){
   gy = gyro.gyro.y * RAD_TO_DEG;
   gz = gyro.gyro.z * RAD_TO_DEG;
   
-  filter.updateIMU(gx, gy, gz, ax, ay, az);  
+  //filter.updateIMU(gx, gy, gz, ax, ay, az);  
+  filter.updateIMU(gy, gx, gz, ay, ax, -1.0 * az);
+  //Swap the x and y readings, such that the roll i get is pitch, but the range is -180 to 180  
+  //Rotate Matrix
 }
 
 
@@ -201,7 +209,7 @@ void setup() {
   Wire.begin(22,20);
   filter.begin(SAMPLE_FREQ);
 
-  pinMode(ANALOG_BAT,INPUT);
+
   pinMode(LED_BUILTIN,OUTPUT);
 
   digitalWrite(LED_BUILTIN,HIGH); //Turn on to signal that we have started setup
@@ -216,6 +224,11 @@ void setup() {
     Serial.println("Unable to find LSM");
     delay(1000);  resetFunc();  //call reset if unable to find item to reinit
   }
+  if (!lc.begin()) {
+    Serial.println(F("Couldnt find Adafruit LC709203F?\nMake sure a battery is plugged in!"));
+    delay(1000);  resetFunc();  //call reset if unable to find item to reinit
+  }
+  lc.setPackSize(LC709203F_APA_1000MAH);  //Acutal pack size is 1500 but we just go under
   
   onboard_pixel.begin();
   onboard_pixel.setBrightness(BRIGHTNESS);
@@ -252,6 +265,7 @@ void loop() {
     Serial.print(pitch);
     Serial.println("");
     */
+    
 
     imu_read_time = millis(); //reset to time last read
 
@@ -264,6 +278,5 @@ void loop() {
   CheckBattery(false);
   CheckSleep();
   CheckToSend(); //if data ready send
-
 
 }

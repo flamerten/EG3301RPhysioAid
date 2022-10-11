@@ -12,7 +12,7 @@
 
 //CHANGABLE
 #define PATIENT_NO 2; //Distiguish between patient nos
-uint8_t master[] = {0xE8,0x9F,0x6D,0x1F,0xFC,0x00}; //Feather Master
+uint8_t master[] = {0xE8,0x9F,0x6D,0x28,0x0C,0x98}; //Feather Master Unlableed
 
 //Feather
 #define NEOPIXEL_I2C_POWER 2
@@ -20,7 +20,7 @@ uint8_t master[] = {0xE8,0x9F,0x6D,0x1F,0xFC,0x00}; //Feather Master
 bool led_on = true;
 
 //Deep sleep
-#define SLEEP_BUTTON 38 
+#define SLEEP_BUTTON 26 
 #define BUTTON_PIN_BITMASK 0x8000000000 // 2^39 in hex
 volatile bool go_to_sleep = false; //For the ISR
 
@@ -98,7 +98,7 @@ void IRAM_ATTR SLEEP_ISR(){
 
 void Setup_DEEPSLEEP(){
   pinMode(SLEEP_BUTTON,INPUT_PULLUP);
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_38,LOW); //Wake up when button pulled low
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_26,LOW); //Wake up when button pulled low
   attachInterrupt(SLEEP_BUTTON, SLEEP_ISR, FALLING); //Interrupt and go to sleep when button pulled low
 
 }
@@ -158,7 +158,8 @@ void get_readings(){
   gy = gyro.gyro.y * RAD_TO_DEG;
   gz = gyro.gyro.z * RAD_TO_DEG;
   
-  filter.updateIMU(gx, gy, gz, ax, ay, az);  
+  //filter.updateIMU(gx, gy, gz, ax, ay, az);  
+  filter.updateIMU(gy, gx, gz, ay, ax, -1.0 * az);  //rotate  matrix
 }
 
 
@@ -223,7 +224,8 @@ void loop() {
 
     imu_read_time = millis(); //reset to time last read
 
-    message.angle = roll; //Lets stick with roll
+    //message.angle = roll; //Lets stick with roll
+    message.angle = pitch; //Lets stick with roll
     esp_now_send(master, (uint8_t *) &message, sizeof(message));
 
     //BLink each time sample is takken

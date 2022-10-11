@@ -223,7 +223,8 @@ void loop() {
 
     imu_read_time = millis(); //reset to time last read
 
-    message.angle = roll; //Lets stick with roll
+    //message.angle = roll; //Lets stick with roll
+    message.angle = pitch; //Lets stick with roll
     esp_now_send(master, (uint8_t *) &message, sizeof(message));
 
     //BLink each time sample is takken
