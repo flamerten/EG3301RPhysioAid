@@ -1,4 +1,4 @@
-# Electrical Components
+# Firmware
 
 This is the set of files where we use the Adafruit components to reduce the size, the M5 was quite thick and didn't have some features that we wanted so we changed our electronic components.
 
