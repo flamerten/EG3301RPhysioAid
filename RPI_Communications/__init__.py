@@ -1,1 +1,0 @@
-from constants import NUM_OF_SENSORS_ENV_VAR
